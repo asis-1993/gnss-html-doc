@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Entorno de análisis · Documentación</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand"><a href="../index.html" style="color:inherit;text-decoration:none;">Documentación</a></div>
+    <div class="brand-sub">Sistema de adquisición vehicular</div>
+
+    <nav>
+      <h4>Primeros pasos</h4>
+      <ul>
+        <li><a href="inicio_rapido.html">Guía de inicio rápido</a></li>
+      </ul>
+
+      <h4>Configuración del sistema</h4>
+      <ul>
+        <li><a href="conexion_wifi.html">Conexión WiFi y SSH</a></li>
+        <li><a href="sincronizacion_drive.html">Sincronización con Google Drive</a></li>
+        <li><a href="rtc_sincronizacion.html">RTC y sincronización horaria</a></li>
+        <li><a href="referencia_configuracion.html">Referencia de configuración</a></li>
+      </ul>
+
+      <h4>Sensores y adquisición</h4>
+      <ul>
+        <li><a href="#" class="pending">Frecuencias de muestreo</a></li>
+        <li><a href="#" class="pending">Configuración del GNSS</a></li>
+      </ul>
+
+      <h4>Análisis de datos</h4>
+      <ul>
+        <li><a href="entorno_analisis.html" class="active">Entorno de análisis (conda + Docker)</a></li>
+        <li><a href="#" class="pending">Descarga de sesiones</a></li>
+      </ul>
+    </nav>
+  </aside>
+
+  <!-- ============ CONTENIDO ============ -->
+  <main class="content">
+
+    <header class="page-header">
+      <p class="kicker">Análisis de datos</p>
+      <h1>Entorno de análisis</h1>
+      <p class="lede">El pipeline de análisis usa dos entornos complementarios: <strong>conda</strong> para el desarrollo iterativo en la PC y <strong>Docker</strong> para el despliegue reproducible del pipeline validado.</p>
+    </header>
+
+    <section>
+      <h2>Flujo de trabajo general</h2>
+      <p>El diagrama muestra la dinámica de trabajo desde la exploración hasta el despliegue. El archivo <code>requirements.txt</code> es el puente entre ambos entornos: se genera desde conda cuando el entorno está estable y Docker lo usa para construir la imagen.</p>
+      <figure style="margin:24px 0;">
+        <img src="../assets/img/flujo_trabajo.svg"
+             alt="Diagrama del flujo de trabajo: desarrollo en conda, requirements.txt como puente, despliegue en Docker"
+             style="width:100%;max-width:760px;display:block;">
+        <figcaption style="font-size:0.88rem;color:#666;font-style:italic;margin-top:8px;">
+          Figura 1 — Dinámica de trabajo: desarrollo diario en conda, despliegue reproducible en Docker.
+        </figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <h2>Flujo de datos</h2>
+      <p>Los datos recorren cuatro etapas desde la captura en campo hasta el despliegue del pipeline. Los archivos CSV originales se conservan en Drive como fuente de verdad y nunca se modifican.</p>
+      <figure style="margin:24px 0;">
+        <img src="../assets/img/flujo_datos.svg"
+             alt="Diagrama del flujo de datos: Raspberry Pi captura, sube a Drive, PC descarga y analiza, Docker despliega"
+             style="width:100%;max-width:820px;display:block;">
+        <figcaption style="font-size:0.88rem;color:#666;font-style:italic;margin-top:8px;">
+          Figura 2 — Flujo completo de datos: desde la captura en campo hasta el despliegue del pipeline de análisis.
+        </figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <h2>Entorno conda — desarrollo diario</h2>
+      <p>Conda aísla las dependencias del proyecto del Python del sistema. Se usa para exploración interactiva con Jupyter, pruebas de código y desarrollo del pipeline.</p>
+
+      <h3>Crear el entorno</h3>
+      <pre><code>conda create -n gnss-analysis python=3.11
+conda activate gnss-analysis</code></pre>
+
+      <h3>Instalar dependencias iniciales</h3>
+      <p>Las dependencias se instalan a medida que el proyecto las requiere, no todas de golpe. Las principales son:</p>
+      <pre><code>pip install pandas numpy scipy scikit-learn
+pip install matplotlib seaborn
+pip install google-auth-oauthlib google-api-python-client
+pip install pyarrow jupyter</code></pre>
+
+      <h3>Activar el entorno en cada sesión</h3>
+      <pre><code>conda activate gnss-analysis</code></pre>
+
+      <h3>Exportar el entorno cuando esté estable</h3>
+      <p>Una vez que el pipeline está validado, se exporta el entorno para generar el <code>requirements.txt</code> que usará Docker:</p>
+      <pre><code># Exportar solo los paquetes instalados con pip (sin dependencias del sistema)
+pip freeze > requirements.txt</code></pre>
+
+      <div class="callout">
+        <span class="tag">buena práctica</span>
+        <p style="margin-bottom:0;">No exportar <code>requirements.txt</code> en cada iteración — solo cuando el pipeline está validado y listo para empaquetar. Así el archivo refleja exactamente lo que se usa, sin paquetes de exploración temporales.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Docker — despliegue reproducible</h2>
+      <p>Docker empaqueta el pipeline y todas sus dependencias en una imagen que corre de forma idéntica en cualquier máquina — la PC de desarrollo, un servidor VPS, o un entorno de CI. Garantiza que el análisis es reproducible independientemente del sistema operativo del equipo que lo ejecute.</p>
+
+      <h3>Estructura del Dockerfile</h3>
+      <pre><code>FROM python:3.11-slim
+
+WORKDIR /app
+
+# Copiar dependencias e instalar
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copiar el código del pipeline
+COPY . .
+
+# Ejecutar el pipeline principal
+CMD ["python", "pipeline.py"]</code></pre>
+
+      <h3>Construir la imagen</h3>
+      <pre><code>docker build -t gnss-analysis:latest .</code></pre>
+
+      <h3>Ejecutar el pipeline</h3>
+      <pre><code># Montando la carpeta de datos local
+docker run --rm \
+  -v $(pwd)/datos:/app/datos \
+  gnss-analysis:latest</code></pre>
+
+      <div class="callout">
+        <span class="tag">nota</span>
+        <p style="margin-bottom:0;">El flag <code>-v $(pwd)/datos:/app/datos</code> monta la carpeta local <code>datos/</code> dentro del contenedor. Los archivos CSV descargados desde Drive están disponibles para el pipeline sin necesidad de copiarlos dentro de la imagen.</p>
+      </div>
+
+      <h3>Despliegue en servidor VPS</h3>
+      <p>Para ejecutar el pipeline de forma automática en un servidor, los pasos son:</p>
+      <ol>
+        <li>Subir la imagen a un registro (Docker Hub o GitHub Container Registry)</li>
+        <li>En el servidor: <code>docker pull</code> y configurar un cron job o systemd timer</li>
+        <li>El pipeline descarga los datos nuevos de Drive, ejecuta el análisis y guarda los resultados</li>
+      </ol>
+      <pre><code># Ejemplo: publicar imagen en GitHub Container Registry
+docker tag gnss-analysis:latest ghcr.io/USUARIO/gnss-analysis:latest
+docker push ghcr.io/USUARIO/gnss-analysis:latest</code></pre>
+    </section>
+
+    <section>
+      <h2>Comparación de entornos</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Característica</th>
+            <th>conda</th>
+            <th>Docker</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Uso principal</td>
+            <td>Desarrollo interactivo, EDA, iteración</td>
+            <td>Pipeline validado, despliegue, reproducibilidad</td>
+          </tr>
+          <tr>
+            <td>Aislamiento</td>
+            <td>Librerías Python</td>
+            <td>Sistema operativo completo</td>
+          </tr>
+          <tr>
+            <td>Jupyter notebooks</td>
+            <td>✓ Nativo</td>
+            <td>Posible, pero poco práctico para EDA</td>
+          </tr>
+          <tr>
+            <td>Reproducibilidad</td>
+            <td>Alta (con <code>requirements.txt</code>)</td>
+            <td>Total (imagen inmutable)</td>
+          </tr>
+          <tr>
+            <td>Portabilidad</td>
+            <td>Requiere conda instalado</td>
+            <td>Corre en cualquier máquina con Docker</td>
+          </tr>
+          <tr>
+            <td>Automatización en servidor</td>
+            <td>Posible, pero frágil</td>
+            <td>Estándar de la industria</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Estructura del repositorio gnss-analysis</h2>
+      <pre><code>gnss-analysis/
+  descargar_datos.py       ← descarga CSVs desde Drive
+  fusion_sensores.py       ← merge_asof + forward-fill
+  pipeline.py              ← punto de entrada principal
+  pipeline/
+    anomalias.py           ← MCD + Isolation Forest
+    clustering.py          ← DBSCAN
+    clasificador.py        ← Random Forest
+  visualizacion/
+    recorridos.py          ← mapas geoespaciales
+    heatmaps.py            ← velocidad y tiempos de espera
+  notebooks/               ← exploración y EDA
+  datos/                   ← en .gitignore (CSVs locales)
+  Dockerfile
+  requirements.txt
+  environment.yml          ← entorno conda exportado
+  .gitignore</code></pre>
+    </section>
+
+  </main>
+</div>
+</body>
+</html>
