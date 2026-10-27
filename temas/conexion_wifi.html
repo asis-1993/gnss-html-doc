@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conexión WiFi y SSH · Documentación</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand"><a href="../index.html" style="color:inherit;text-decoration:none;">Documentación</a></div>
+    <div class="brand-sub">Sistema de adquisición vehicular</div>
+
+    <nav>
+      <h4>Configuración del sistema</h4>
+      <ul>
+        <li><a href="conexion_wifi.html" class="active">Conexión WiFi y SSH</a></li>
+      </ul>
+
+      <h4>Sensores y adquisición</h4>
+      <ul>
+        <li><a href="#" class="pending">Frecuencias de muestreo</a></li>
+        <li><a href="#" class="pending">Configuración del GNSS</a></li>
+      </ul>
+    </nav>
+  </aside>
+
+  <!-- ============ CONTENIDO ============ -->
+  <main class="content">
+
+    <header class="page-header">
+      <p class="kicker">Configuración del sistema</p>
+      <h1>Conexión WiFi y SSH</h1>
+      <p class="lede">Cómo preparar la Raspberry Pi para conectarse a la red WiFi y acceder por SSH desde cualquier sistema operativo.</p>
+    </header>
+
+    <section>
+      <h2>Requisitos previos</h2>
+      <ul>
+        <li>Tarjeta microSD (mínimo 32 GB — recomendado Samsung o SanDisk Endurance)</li>
+        <li>Red WiFi disponible (nombre y contraseña)</li>
+        <li>Acceso al panel de administración del router</li>
+        <li><strong>Raspberry Pi 5</strong> (4 GB u 8 GB)</li>
+      </ul>
+      <div class="callout">
+        <span class="tag">compatibilidad</span>
+        <p style="margin-bottom:0;">La imagen preconfigurada fue creada y probada exclusivamente para la <strong>Raspberry Pi 5</strong>. No es compatible con modelos anteriores (Raspberry Pi 4, 3, B+, etc.) debido a diferencias en el chip de procesamiento y las interfaces de hardware.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Paso 1 — Grabar la imagen en la microSD</h2>
+      <p>Descarga la imagen preconfigurada del repositorio del proyecto. La imagen incluye el sistema operativo, las librerías de Python, los scripts de adquisición y todas las configuraciones de hardware (GPIO, I²C, UART). Solo es necesario agregar las credenciales WiFi.</p>
+      <p>Graba la imagen con el <strong>Raspberry Pi Imager</strong>:</p>
+      <ol>
+        <li>Abre el Raspberry Pi Imager</li>
+        <li>En <em>Operating System</em> selecciona <strong>Use custom</strong></li>
+        <li>Elige el archivo <code>.img.xz</code> descargado</li>
+        <li>Se selecciona la microSD en <em>Storage</em></li>
+        <li>Haz clic en <strong>Next</strong> — cuando pregunte si deseas aplicar configuración personalizada, selecciona <strong>No</strong> — la imagen ya viene preconfigurada</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>Paso 2 — Agregar la red WiFi</h2>
+      <p>La única configuración necesaria es agregar las credenciales de la red WiFi. Este paso varía según el sistema operativo del equipo utilizado.</p>
+
+      <h3>En Linux</h3>
+      <p>Se inserta la microSD en la PC. Se verifica que fue detectada:</p>
+      <div class="code-block">
+        <div class="code-label">bash</div>
+        <pre><code>lsblk
+<span class="cm"># Busca el dispositivo con dos particiones: bootfs y rootfs</span></code></pre>
+      </div>
+
+      <div class="callout">
+        <span class="tag">nota</span>
+        <p style="margin-bottom:6px;">En los comandos siguientes, se reemplaza <code>TU_USUARIO</code> con el nombre del usuario en Linux. Puede verificarse con:</p>
+        <div class="code-block" style="margin:0;">
+          <div class="code-label">bash</div>
+          <pre><code>whoami</code></pre>
+        </div>
+      </div>
+
+      <div class="callout">
+        <span class="tag">múltiples redes</span>
+        <p style="margin-bottom:0;">Se debe crear <strong>un archivo independiente por cada red WiFi</strong> que se desee agregar. El nombre del archivo puede ser cualquiera, pero por claridad se recomienda usar el nombre de la red. Por ejemplo: <code>IZZI-628E.nmconnection</code>, <code>MI_RED_CASA.nmconnection</code>. La Raspberry Pi intentará conectarse automáticamente a cualquiera de las redes configuradas que estén disponibles.</p>
+      </div>
+
+      <p>Se crea el archivo de configuración de red:</p>
+      <div class="code-block">
+        <div class="code-label">bash</div>
+        <pre><code>sudo nano /media/TU_USUARIO/rootfs/etc/NetworkManager/system-connections/MI_RED.nmconnection</code></pre>
+      </div>
+
+      <p>Se escribe el siguiente contenido — sustituyendo <code>NOMBRE_RED</code> y <code>CONTRASEÑA</code> con los datos de la red:</p>
+      <div class="code-block">
+        <div class="code-label">ini</div>
+        <pre><code>[connection]
+id=NOMBRE_RED
+type=wifi
+autoconnect=true
+
+[wifi]
+mode=infrastructure
+ssid=NOMBRE_RED
+
+[wifi-security]
+auth-alg=open
+key-mgmt=wpa-psk
+psk=CONTRASEÑA
+
+[ipv4]
+method=auto
+
+[ipv6]
+method=auto</code></pre>
+      </div>
+
+      <p>Se guarda con <kbd>Ctrl+O</kbd>, Enter, <kbd>Ctrl+X</kbd>. Ajusta los permisos — NetworkManager requiere que estos archivos solo sean legibles por root:</p>
+      <div class="code-block">
+        <div class="code-label">bash</div>
+        <pre><code>sudo chmod 600 /media/TU_USUARIO/rootfs/etc/NetworkManager/system-connections/MI_RED.nmconnection</code></pre>
+      </div>
+
+      <p>Se desmonta la microSD de forma segura:</p>
+      <div class="code-block">
+        <div class="code-label">bash</div>
+        <pre><code>sudo umount /media/TU_USUARIO/bootfs
+sudo umount /media/TU_USUARIO/rootfs</code></pre>
+      </div>
+
+      <h3>En Windows</h3>
+      <p>En Windows el sistema de archivos <code>ext4</code> de la Raspberry Pi no es legible nativamente. La alternativa es conectar la Raspberry Pi por <strong>cable Ethernet</strong> al router, acceder por SSH y configurar el WiFi desde adentro del sistema.</p>
+      <ol>
+        <li>Se inserta la microSD en la Raspberry Pi y conecta el cable Ethernet al router</li>
+        <li>Se se conecta la alimentación y espera <strong>60 segundos</strong></li>
+        <li>Se accede al panel de administración del router y se busca la sección de <em>dispositivos conectados</em> para encontrar la IP asignada a la Raspberry Pi</li>
+        <li>Conéctate por SSH desde PowerShell:</li>
+      </ol>
+      <div class="code-block">
+        <div class="code-label">powershell</div>
+        <pre><code>ssh adq@192.168.X.XXX</code></pre>
+      </div>
+      <p>Una vez dentro, configura el WiFi:</p>
+      <div class="code-block">
+        <div class="code-label">bash</div>
+        <pre><code>sudo nmcli device wifi connect "NOMBRE_RED" password "CONTRASEÑA"</code></pre>
+      </div>
+      <p>Verifica que la conexión fue exitosa:</p>
+      <div class="code-block">
+        <div class="code-label">bash</div>
+        <pre><code>ping -c 4 google.com</code></pre>
+      </div>
+      <p>Se desconecta el cable Ethernet — la Raspberry Pi se reconectará automáticamente por WiFi.</p>
+    </section>
+
+    <section>
+      <h2>Paso 3 — Encender y conectarse por SSH</h2>
+      <p>Se inserta la microSD en la Raspberry Pi y se conecta la alimentación. Se espera aproximadamente <strong>60 segundos</strong>.</p>
+
+      <h3>Encontrar la dirección IP</h3>
+      <p>Desde la PC, se identifica el rango de la red:</p>
+      <div class="code-block">
+        <div class="code-label">bash</div>
+        <pre><code>ip route   <span class="cm"># Linux / macOS</span></code></pre>
+      </div>
+      <p>Se busca la línea que contenga <code>scope link</code> y cuya interfaz (<code>dev</code>) empiece con <code>w</code> (WiFi) o <code>e</code> (Ethernet). Se descartan líneas con interfaces como <code>docker</code>, <code>br</code>, <code>vir</code> o <code>lo</code>.</p>
+
+      <div class="example">
+        <h3>Ejemplo de salida de ip route</h3>
+        <table>
+          <tr><th>Línea</th><th>Acción</th></tr>
+          <tr>
+            <td><code>192.168.1.0/24 dev wlp0s20f3 scope link</code></td>
+            <td style="color:var(--pos);font-weight:600;">Usar</td>
+          </tr>
+          <tr>
+            <td><code>172.17.0.0/16 dev docker0 scope link</code></td>
+            <td style="color:var(--neg);font-weight:600;">Descartar</td>
+          </tr>
+        </table>
+        <p style="margin-bottom:0;" class="note">Las direcciones mostradas son de ejemplo — deben sustituirse por las que resulten del comando <code>ip route</code> en el equipo utilizado.</p>
+      </div>
+
+      <p>Se escanea la red usando el rango identificado en el paso anterior:</p>
+      <div class="code-block">
+        <div class="code-label">bash</div>
+        <pre><code><span class="cm"># Linux / macOS — sustituir 192.168.1 por el rango obtenido con ip route</span>
+sudo nmap -sn 192.168.1.0/24
+
+<span class="cm"># Windows — sustituir 192.168.1 por el rango obtenido con el panel del router</span>
+nmap -sn 192.168.1.0/24</code></pre>
+      </div>
+      <p class="note">La Raspberry Pi aparecerá con MAC que comienza con <code>D8:3A:DD</code> — prefijo de la Raspberry Pi Foundation.</p>
+
+      <h3>Conectarse</h3>
+      <div class="code-block">
+        <div class="code-label">bash</div>
+        <pre><code><span class="cm"># Linux / macOS / PowerShell Windows 10+</span>
+<span class="cm"># Sustituir 192.168.1.XXX por la IP identificada en el escaneo</span>
+ssh adq@192.168.1.XXX</code></pre>
+      </div>
+      <p>La primera vez el sistema pedirá confirmar la autenticidad del host — se se escribe <code>yes</code> y se se presiona Enter. Si la conexión fue exitosa se mostrará:</p>
+      <div class="code-out">adq@rpi-gnss:~ $</div>
+      <p class="note">En Windows también se puede usar <a href="https://www.putty.org" target="_blank">PuTTY</a> como cliente SSH gráfico — se se ingresa la IP en el campo <em>Host Name</em> y se selecciona <em>SSH</em> como tipo de conexión.</p>
+    </section>
+
+    <section>
+      <h2>Paso 4 — Fijar la dirección IP (recomendado)</h2>
+      <p>Por defecto el router asigna una dirección IP diferente cada vez que la Raspberry Pi se conecta. Para evitar tener que buscarla en cada ocasión, se se configura una <strong>reserva de DHCP</strong> en el router.</p>
+      <p>Se accede al panel de administración del router y se se busca la sección de <em>reserva de DHCP</em> o <em>asignación estática de IP</em>. Se registra la dirección MAC de la Raspberry Pi junto con la IP que se desea asignar de forma permanente.</p>
+      <p>Se consulta la dirección MAC con:</p>
+      <div class="code-block">
+        <div class="code-label">bash</div>
+        <pre><code>ip link show wlan0
+<span class="cm"># Se busca la línea "link/ether XX:XX:XX:XX:XX:XX"</span></code></pre>
+      </div>
+      <div class="callout">
+        <span class="tag">modo sincronización</span>
+        <p style="margin-bottom:0;">Una vez que la dirección IP esté fija y la red WiFi configurada, el sistema subirá los archivos automáticamente en cuanto se seleccione el modo sincronización en el interruptor y se encienda el dispositivo — sin ninguna intervención adicional. Garantizar la conexión WiFi y fijar la dirección IP son la única configuración que debe realizarse para que la transferencia de datos funcione de forma autónoma.</p>
+      </div>
+    </section>
+
+    <footer class="page-footer">
+      Documentación del sistema de adquisición de datos vehiculares — Universidad Tecnológica de la Mixteca.
+    </footer>
+
+  </main>
+
+</div>
+</body>
+</html>

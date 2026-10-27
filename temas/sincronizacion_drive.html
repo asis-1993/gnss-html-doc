@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sincronización con Google Drive — Sistema GNSS</title>
+  <style>
+:root{
+  --paper:#faf7f1;
+  --ink:#1f2a24;
+  --ink-soft:#4a564f;
+  --rule:#d8d0c0;
+  --accent:#8a6d3b;
+  --accent-soft:#efe6d4;
+  --formula-bg:#f1ece0;
+  --pos:#3f6b4a;
+  --neg:#a4443a;
+  --sidebar-w:260px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  line-height:1.6;
+}
+.layout{display:flex;min-height:100vh;}
+.sidebar{
+  width:var(--sidebar-w);
+  flex-shrink:0;
+  background:#f2ede2;
+  border-right:1px solid var(--rule);
+  padding:32px 24px;
+  position:sticky;
+  top:0;
+  height:100vh;
+  overflow-y:auto;
+}
+.sidebar .brand{font-size:1.15rem;font-weight:600;margin-bottom:4px;}
+.sidebar .brand-sub{font-size:0.85rem;font-style:italic;color:var(--ink-soft);margin-bottom:28px;}
+.sidebar nav h4{
+  font-size:0.78rem;
+  text-transform:none;
+  letter-spacing:0.02em;
+  color:var(--ink-soft);
+  font-style:italic;
+  margin:20px 0 8px 0;
+  border-bottom:1px solid var(--rule);
+  padding-bottom:6px;
+}
+.sidebar nav ul{list-style:none;margin:0 0 4px 0;padding:0;}
+.sidebar nav li{margin-bottom:2px;}
+.sidebar nav a{
+  display:block;
+  padding:6px 10px;
+  border-radius:3px;
+  color:var(--ink);
+  text-decoration:none;
+  font-size:0.98rem;
+}
+.sidebar nav a:hover{background:var(--accent-soft);}
+.sidebar nav a.active{background:var(--accent);color:#fff;}
+.content{flex:1;padding:64px 48px 96px;max-width:820px;}
+@media(max-width:800px){
+  .layout{flex-direction:column;}
+  .sidebar{width:100%;height:auto;position:relative;border-right:none;border-bottom:1px solid var(--rule);}
+  .content{padding:36px 24px 64px;}
+}
+h1{font-size:2.4rem;margin:0 0 24px 0;letter-spacing:-0.01em;}
+h2{font-size:1.3rem;margin:44px 0 12px 0;border-left:4px solid var(--accent);padding-left:14px;}
+h3{font-size:1.02rem;margin:22px 0 8px 0;color:var(--accent);}
+p{margin:0 0 14px 0;font-size:1.03rem;}
+ul,ol{margin:0 0 14px 0;padding-left:22px;}
+li{margin-bottom:6px;}
+a{color:var(--accent);}
+
+/* Admonitions */
+.admonition{
+  border-left:4px solid var(--accent);
+  background:var(--accent-soft);
+  padding:14px 18px;
+  margin:18px 0;
+  font-size:0.97rem;
+}
+.admonition.important{
+  border-left-color:var(--neg);
+  background:#f9eded;
+}
+.admonition p{margin:0 0 8px 0;}
+.admonition p:last-child{margin:0;}
+.admonition ul{margin:8px 0 0 0;}
+
+/* Código */
+pre{
+  background:#20261f;
+  color:#e9ecdf;
+  border-radius:3px;
+  padding:16px 20px;
+  margin:12px 0 18px 0;
+  overflow-x:auto;
+  font-family:"SF Mono","Fira Code",Consolas,Menlo,monospace;
+  font-size:0.88rem;
+  line-height:1.55;
+}
+code{
+  font-family:"SF Mono","Fira Code",Consolas,Menlo,monospace;
+  font-size:0.88em;
+  background:var(--formula-bg);
+  border:1px solid var(--rule);
+  border-radius:2px;
+  padding:1px 5px;
+}
+pre code{background:none;border:none;padding:0;font-size:inherit;}
+
+/* Tabla */
+table{width:100%;border-collapse:collapse;margin:16px 0 8px 0;font-size:0.98rem;}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--rule);}
+th{font-style:italic;color:var(--ink-soft);font-weight:normal;border-bottom:2px solid var(--ink);}
+  </style>
+</head>
+<body>
+<div class="layout">
+
+  <div class="sidebar">
+    <div class="brand">Sistema GNSS</div>
+    <div class="brand-sub">Universidad Tecnológica de la Mixteca</div>
+    <nav>
+      <h4>Guías</h4>
+      <ul>
+        <li><a href="index.html">Inicio</a></li>
+        <li><a href="inicio_rapido.html">Inicio rápido</a></li>
+        <li><a href="conexion_wifi.html">Conexión WiFi y SSH</a></li>
+        <li><a href="sincronizacion_drive.html" class="active">Sincronización con Drive</a></li>
+        <li><a href="referencia_configuracion.html">Referencia de configuración</a></li>
+      </ul>
+    </nav>
+  </div>
+
+  <div class="content">
+    <h1>Sincronización con Google Drive</h1>
+    <p>Esta guía describe el proceso completo de configuración de la autenticación OAuth 2.0 para sincronizar las sesiones de captura con Google Drive de forma automática.</p>
+
+    <div class="admonition">
+      <p><strong>Nota:</strong> Esta configuración se realiza una sola vez desde la PC. Una vez completada, la Raspberry Pi sincroniza de forma autónoma al seleccionar el modo de sincronización mediante el interruptor.</p>
+    </div>
+
+    <h2>Requisitos previos</h2>
+    <ul>
+      <li>Cuenta de Google con Google Drive activo (<code>telematica.vehicular.utm@gmail.com</code>)</li>
+      <li>Acceso a <a href="https://console.cloud.google.com" target="_blank">Google Cloud Console</a></li>
+      <li>Python 3 instalado en la PC</li>
+      <li>Conexión SSH a la Raspberry Pi</li>
+    </ul>
+
+    <h2>Paso 1 — Crear proyecto en Google Cloud Console</h2>
+    <ol>
+      <li>Acceder a <a href="https://console.cloud.google.com" target="_blank">console.cloud.google.com</a></li>
+      <li>Crear un nuevo proyecto: <strong>proyecto-gnss</strong></li>
+      <li>En el menú lateral ir a <strong>APIs &amp; Services → Library</strong></li>
+      <li>Buscar y habilitar la API: <strong>Google Drive API</strong></li>
+    </ol>
+
+    <h2>Paso 2 — Completar la información de Branding</h2>
+    <p>En el menú lateral de <strong>Google Auth Platform</strong> ir a <strong>Branding</strong> y completar los campos obligatorios:</p>
+    <ul>
+      <li><em>App name:</em> <code>rpi-gnss</code></li>
+      <li><em>User support email:</em> correo del proyecto</li>
+      <li><em>Application home page:</em> URL del repositorio en GitHub</li>
+      <li><em>Application privacy policy link:</em> URL del archivo <code>PRIVACY.md</code> en GitHub</li>
+      <li><em>Developer contact information:</em> correo del desarrollador</li>
+    </ul>
+    <p>Hacer clic en <strong>Save</strong> para guardar los cambios.</p>
+
+    <div class="admonition">
+      <p><strong>Nota sobre el archivo PRIVACY.md:</strong> debe existir en la raíz del repositorio antes de guardar la configuración. La URL tiene la forma <code>https://github.com/USUARIO/REPOSITORIO/blob/main/PRIVACY.md</code>. El segmento <code>blob/main</code> no es una carpeta — es la forma en que GitHub construye la URL para visualizar archivos; el archivo debe estar en la raíz del repositorio.</p>
+    </div>
+
+    <h2>Paso 3 — Publicar la aplicación en producción</h2>
+    <p>Este paso es fundamental para garantizar que el token de autenticación no expire. Las aplicaciones en modo <em>Testing</em> tienen sus tokens revocados automáticamente después de 7 días, lo que requeriría regenerar el token semanalmente.</p>
+    <ol>
+      <li>En el menú lateral de <strong>Google Auth Platform</strong> ir a <strong>Audience</strong></li>
+      <li>La sección <em>Publishing status</em> mostrará el estado <strong>Testing</strong> con el botón <strong>Publish app</strong></li>
+      <li>Si el botón aparece deshabilitado con el mensaje <em>"complete your configuration on the Branding page"</em>, es necesario completar primero el Paso 2</li>
+      <li>Una vez habilitado, hacer clic en <strong>Publish app</strong> y confirmar</li>
+      <li>El estado debe cambiar a <strong>In production</strong></li>
+    </ol>
+
+    <div class="admonition important">
+      <p><strong>Beneficios de publicar en producción:</strong></p>
+      <ul>
+        <li>El token de autenticación <strong>no expira</strong> por política de Google</li>
+        <li>El sistema sincroniza de forma completamente autónoma sin intervención manual</li>
+        <li>No es necesario regenerar el token periódicamente</li>
+        <li>El <em>access token</em> de corta duración (60 minutos) se renueva de forma automática usando el <em>refresh token</em> almacenado en <code>token.json</code></li>
+      </ul>
+      <p>Sin publicar la aplicación, el token expira cada 7 días y la sincronización falla con el error <code>invalid_grant: Token has been expired or revoked</code>.</p>
+    </div>
+
+    <h2>Paso 4 — Crear credenciales OAuth</h2>
+    <ol>
+      <li>Ir a <strong>APIs &amp; Services → Credentials</strong></li>
+      <li>Hacer clic en <strong>Create Credentials → OAuth client ID</strong></li>
+      <li>Tipo de aplicación: <strong>Desktop app</strong></li>
+      <li>Nombre: <code>rpi-gnss-client</code></li>
+      <li>Descargar el archivo JSON de credenciales</li>
+      <li>Renombrar el archivo a <code>client_secret.json</code></li>
+    </ol>
+
+    <h2>Paso 5 — Preparar el entorno en la PC</h2>
+    <p>Crear un entorno virtual temporal e instalar las dependencias necesarias:</p>
+    <p><strong>Linux / macOS:</strong></p>
+    <pre><code>python3 -m venv /tmp/oauth_env
+source /tmp/oauth_env/bin/activate
+pip install google-auth-oauthlib google-api-python-client</code></pre>
+    <p><strong>Windows:</strong></p>
+    <pre><code>python -m venv %TEMP%\oauth_env
+%TEMP%\oauth_env\Scripts\activate
+pip install google-auth-oauthlib google-api-python-client</code></pre>
+
+    <h2>Paso 6 — Generar el token de autenticación</h2>
+    <p>Colocar <code>client_secret.json</code> y <code>autorizar.py</code> en el mismo directorio y ejecutar:</p>
+    <pre><code>python3 autorizar.py</code></pre>
+    <p>Se abrirá el navegador solicitando autorización. Al aparecer la advertencia <em>"Google hasn't verified this app"</em>:</p>
+    <ol>
+      <li>Hacer clic en <strong>Advanced</strong></li>
+      <li>Hacer clic en <strong>Go to rpi-gnss (unsafe)</strong></li>
+      <li>Seleccionar la cuenta del proyecto y autorizar el acceso a Google Drive</li>
+    </ol>
+    <p>El script generará el archivo <code>token.json</code> en el directorio actual.</p>
+
+    <div class="admonition">
+      <p><strong>Nota sobre la advertencia de seguridad:</strong> La advertencia <em>"Google hasn't verified this app"</em> es normal para aplicaciones propias que no han pasado por el proceso de verificación formal de Google. Al ser el desarrollador de la aplicación, es seguro continuar.</p>
+    </div>
+
+    <h2>Paso 7 — Copiar el token a la Raspberry Pi</h2>
+    <pre><code>scp token.json adq@&lt;IP_RASPBERRY&gt;:/home/adq/proyecto-gnss/token.json</code></pre>
+    <p>Sustituir <code>&lt;IP_RASPBERRY&gt;</code> por la dirección IP de la Raspberry Pi en la red local.</p>
+
+    <h2>Paso 8 — Verificar la sincronización</h2>
+    <p>Conectarse por SSH a la Raspberry Pi y ejecutar:</p>
+    <pre><code>cd /home/adq/proyecto-gnss
+source env_librerias_gnss/bin/activate
+python3 sincronizacion.py</code></pre>
+    <p>Una sincronización exitosa produce una salida similar a:</p>
+    <pre><code>[SYNC] INFO: Sesiones pendientes: 2
+[SYNC] INFO: Conexión a internet disponible.
+[SYNC] INFO: Conectado a Google Drive
+[SYNC] INFO: Sincronizando sesión 20260926_154149...
+[SYNC] INFO:   Carpeta del día creada: 20260926
+[SYNC] INFO:   Subiendo imu_20260926_154149.csv (intento 1/3)...
+[SYNC] INFO:   imu_20260926_154149.csv verificado.
+[SYNC] INFO:   ✓ imu_20260926_154149.csv eliminado localmente
+[SYNC] INFO: Sesión 20260926_154149 sincronizada correctamente.
+[SYNC] INFO: Sincronización completada: 2/2 sesiones.
+
+Resultado: 2/2 sesiones sincronizadas.</code></pre>
+
+    <h2>Comportamiento del sistema</h2>
+    <ul>
+      <li><strong>Organización en Drive:</strong> los archivos se organizan en carpetas por día con formato <code>YYYYMMDD</code> dentro de la carpeta principal del proyecto</li>
+      <li><strong>Verificación de integridad:</strong> cada archivo se verifica mediante MD5 antes de eliminarse localmente</li>
+      <li><strong>Reintentos automáticos:</strong> en caso de error de red, el sistema reintenta la subida hasta 3 veces con 5 segundos de espera entre intentos</li>
+      <li><strong>Sesión válida:</strong> una sesión debe contener al menos el archivo IMU para ser sincronizada; GNSS y barométrico son opcionales</li>
+      <li><strong>Eliminación local:</strong> los archivos se eliminan de la Raspberry Pi únicamente después de confirmar la subida exitosa mediante MD5</li>
+      <li><strong>Renovación automática del token:</strong> el <em>access token</em> se renueva de forma automática usando el <em>refresh token</em> en <code>token.json</code>; no requiere intervención manual</li>
+    </ul>
+
+    <h2>Solución de problemas</h2>
+
+    <h3>Error: invalid_grant: Token has been expired or revoked</h3>
+    <p>La causa más común es que la aplicación se encontraba en modo <em>Testing</em> — Google revoca automáticamente los tokens de aplicaciones en modo prueba después de 7 días.</p>
+    <p><strong>Solución:</strong> verificar que la aplicación esté publicada en producción (Paso 3), regenerar el token (Pasos 5 y 6) y copiarlo a la Raspberry Pi (Paso 7).</p>
+
+    <h3>Error: invalid_grant: Bad Request</h3>
+    <p>Variante del error anterior con la misma causa y solución.</p>
+
+    <h3>Sin conexión WiFi</h3>
+    <p>El sistema espera hasta 60 segundos a que haya conexión a internet antes de intentar sincronizar. Si no hay conexión disponible, el proceso termina sin subir archivos. Los archivos permanecen en la Raspberry Pi y serán sincronizados en la siguiente sesión.</p>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guía de inicio rápido · Documentación</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="brand"><a href="../index.html" style="color:inherit;text-decoration:none;">Documentación</a></div>
+    <div class="brand-sub">Sistema de adquisición vehicular</div>
+    <nav>
+      <h4>Primeros pasos</h4>
+      <ul>
+        <li><a href="inicio_rapido.html" class="active">Guía de inicio rápido</a></li>
+      </ul>
+      <h4>Configuración del sistema</h4>
+      <ul>
+        <li><a href="conexion_wifi.html">Conexión WiFi y SSH</a></li>
+        <li><a href="sincronizacion_drive.html">Sincronización con Google Drive</a></li>
+      </ul>
+      <h4>Sensores y adquisición</h4>
+      <ul>
+        <li><a href="#" class="pending">Frecuencias de muestreo</a></li>
+        <li><a href="#" class="pending">Configuración del GNSS</a></li>
+      </ul>
+    </nav>
+  </aside>
+
+  <main class="content">
+
+    <header class="page-header">
+      <p class="kicker">Primeros pasos</p>
+      <h1>Guía de inicio rápido</h1>
+      <p class="lede">Pasos necesarios antes de la primera sesión de captura. Seguir este orden garantiza que el sistema quede correctamente configurado.</p>
+    </header>
+
+    <div class="callout">
+      <span class="tag">importante</span>
+      <p style="margin-bottom:0;">Esta guía debe seguirse completamente antes de iniciar la primera sesión de captura. Si se omite la configuración inicial del receptor GNSS, el sistema operará con los valores de fábrica — incluyendo una frecuencia de actualización de 1 Hz en lugar de los 5 Hz recomendados.</p>
+    </div>
+
+    <section>
+      <h2>Paso 1 — Preparar la microSD</h2>
+      <p>Grabar la imagen preconfigurada en la microSD y agregar las credenciales de la red WiFi. Consultar la guía <a href="conexion_wifi.html">Conexión WiFi y SSH</a> para el procedimiento completo.</p>
+    </section>
+
+    <section>
+      <h2>Paso 2 — Configurar la sincronización</h2>
+      <p>Crear el proyecto en Google Cloud, generar el token OAuth y copiarlo a la Raspberry Pi. Consultar la guía <a href="sincronizacion_drive.html">Sincronización con Google Drive</a> para el procedimiento completo.</p>
+    </section>
+
+    <section>
+      <h2>Paso 3 — Configuración inicial del sistema</h2>
+      <p>Con el interruptor en modo <strong>configuración</strong> (posición central), encender el dispositivo y conectarse por SSH:</p>
+      <div class="code-block">
+        <div class="code-label">bash</div>
+        <pre><code>ssh adq@192.168.X.XXX</code></pre>
+      </div>
+
+      <p>Activar el ambiente virtual y ejecutar el script de configuración:</p>
+      <div class="code-block">
+        <div class="code-label">bash</div>
+        <pre><code>cd /home/adq/proyecto-gnss
+source env_librerias_gnss/bin/activate
+python3 configurar_sistema.py</code></pre>
+      </div>
+
+      <p>En el menú principal seleccionar la opción <strong>3 — Configurar sensor GNSS</strong> y dentro de ese submenú seleccionar <strong>5 — Configuración inicial recomendada</strong>. Esta secuencia realiza automáticamente:</p>
+
+      <div class="example">
+        <h3>Secuencia de configuración inicial</h3>
+        <table>
+          <tr><th>Paso</th><th>Acción</th><th>Resultado</th></tr>
+          <tr><td>1</td><td>Cold start</td><td>Borra configuración previa del receptor</td></tr>
+          <tr><td>2</td><td>Modo Automotive</td><td>Optimizado para vehículos de pasajeros</td></tr>
+          <tr><td>3</td><td>Frecuencia 5 Hz</td><td>Una posición cada 200 ms</td></tr>
+          <tr><td>4</td><td>Optimizar mensajes NMEA</td><td>Solo GGA y RMC — reduce tráfico en el bus</td></tr>
+        </table>
+      </div>
+
+      <p>Al completarse, verificar que el receptor responde con el mensaje:</p>
+      <div class="code-out">Configuración inicial completada.
+El sistema está listo para iniciar sesiones de captura.</div>
+    </section>
+
+    <section>
+      <h2>Paso 4 — Verificar la configuración</h2>
+      <p>Antes de cerrar la sesión SSH, verificar que el archivo <code>config.json</code> contiene los valores correctos:</p>
+      <div class="code-block">
+        <div class="code-label">bash</div>
+        <pre><code>cat /home/adq/proyecto-gnss/config.json</code></pre>
+      </div>
+      <p>El resultado debe ser similar a:</p>
+      <div class="code-block">
+        <div class="code-label">json</div>
+        <pre><code>{
+  "gnss_mode": 4,
+  "gnss_mode_name": "Automotive",
+  "gnss_rate_hz": 5,
+  "imu_rate_hz": 100,
+  "imu_range_g": 8,
+  "baro_rate_hz": 5
+}</code></pre>
+      </div>
+
+      <div class="callout">
+        <span class="tag">valores por defecto</span>
+        <p style="margin-bottom:0;">Si <code>imu_rate_hz</code>, <code>imu_range_g</code> o <code>baro_rate_hz</code> no aparecen en el archivo, el sistema usará los valores por defecto (100 Hz, 8g y 5 Hz respectivamente) al iniciar la adquisición. Solo la configuración del GNSS requiere ejecutarse explícitamente.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Paso 5 — Primera sesión de captura</h2>
+      <p>Apagar el dispositivo con el botón físico. Cambiar el interruptor a la posición de <strong>captura</strong> (izquierda) y encender nuevamente.</p>
+      <p>El LED parpadeará lentamente (1 Hz) indicando que la adquisición está en curso. El sistema capturará datos de los tres sensores de forma autónoma hasta que se apague el dispositivo.</p>
+
+      <div class="example">
+        <h3>Estados del LED</h3>
+        <table>
+          <tr><th>LED</th><th>Modo</th><th>Estado</th></tr>
+          <tr><td>Parpadeo lento (1 Hz)</td><td>Captura</td><td>Adquisición en curso</td></tr>
+          <tr><td>Parpadeo rápido (5 Hz)</td><td>Sincronización</td><td>Subiendo archivos a Google Drive</td></tr>
+          <tr><td>LED fijo</td><td>Sincronización</td><td>Sincronización completada</td></tr>
+          <tr><td>LED fijo</td><td>Configuración</td><td>Esperando conexión SSH</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Paso 6 — Primera sincronización</h2>
+      <p>Al terminar la sesión de captura, apagar el dispositivo, cambiar el interruptor a la posición de <strong>sincronización</strong> (derecha) y encender nuevamente.</p>
+      <p>El sistema se conectará automáticamente a la red WiFi y subirá todos los archivos pendientes a Google Drive. Al completarse, el LED quedará fijo. En ese momento el dispositivo puede apagarse.</p>
+    </section>
+
+    <footer class="page-footer">
+      Documentación del sistema de adquisición de datos vehiculares — Universidad Tecnológica de la Mixteca.
+    </footer>
+
+  </main>
+</div>
+</body>
+</html>

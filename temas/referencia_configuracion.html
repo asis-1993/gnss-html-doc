@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Referencia de configuración · Documentación</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="brand"><a href="../index.html" style="color:inherit;text-decoration:none;">Documentación</a></div>
+    <div class="brand-sub">Sistema de adquisición vehicular</div>
+    <nav>
+      <h4>Primeros pasos</h4>
+      <ul>
+        <li><a href="inicio_rapido.html">Guía de inicio rápido</a></li>
+      </ul>
+      <h4>Configuración del sistema</h4>
+      <ul>
+        <li><a href="conexion_wifi.html">Conexión WiFi y SSH</a></li>
+        <li><a href="sincronizacion_drive.html">Sincronización con Google Drive</a></li>
+        <li><a href="referencia_configuracion.html" class="active">Referencia de configuración</a></li>
+      </ul>
+      <h4>Sensores y adquisición</h4>
+      <ul>
+        <li><a href="#" class="pending">Frecuencias de muestreo</a></li>
+        <li><a href="#" class="pending">Configuración del GNSS</a></li>
+      </ul>
+    </nav>
+  </aside>
+
+  <main class="content">
+
+    <header class="page-header">
+      <p class="kicker">Configuración del sistema</p>
+      <h1>Referencia de configuración</h1>
+      <p class="lede">Descripción de todas las opciones disponibles en <code>configurar_sistema.py</code> — qué significa cada parámetro y qué implica modificarlo.</p>
+    </header>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section>
+      <h2>Configuración recomendada</h2>
+      <p>Los siguientes pasos establecen la configuración óptima para sesiones de captura en vehículos comerciales ligeros tipo furgón de pasajeros. Se ejecutan desde <code>configurar_sistema.py</code> en modo configuración, antes de la primera sesión de captura.</p>
+
+      <div class="callout">
+        <span class="tag">orden importante</span>
+        <p style="margin-bottom:0;">La configuración del GNSS incluye un cold start que borra cualquier configuración previa del receptor. Por esta razón se recomienda configurar primero los sensores de inercia y barométrico — que no requieren comunicación con el receptor — y dejar el GNSS para el último paso.</p>
+      </div>
+
+      <h3>Paso 1 — Sensor de inercia (IMU)</h3>
+      <p>Seleccionar la opción <strong>1 — Configurar sensor de inercia</strong> y aplicar:</p>
+      <table>
+        <tr><th>Parámetro</th><th>Valor recomendado</th><th>Justificación</th></tr>
+        <tr>
+          <td>Frecuencia de muestreo</td>
+          <td><strong>100 Hz</strong></td>
+          <td>Captura eventos de hasta 10 ms de duración — suficiente para baches, frenadas y curvas agresivas en carretera</td>
+        </tr>
+        <tr>
+          <td>Rango del acelerómetro</td>
+          <td><strong>8g</strong></td>
+          <td>Cubre las aceleraciones máximas esperadas en conducción de riesgo (frenadas de emergencia, baches severos) sin saturar el sensor</td>
+        </tr>
+      </table>
+
+      <h3>Paso 2 — Sensor de presión barométrica</h3>
+      <p>Seleccionar la opción <strong>2 — Configurar sensor de presión barométrica</strong> y aplicar:</p>
+      <table>
+        <tr><th>Parámetro</th><th>Valor recomendado</th><th>Justificación</th></tr>
+        <tr>
+          <td>Frecuencia de muestreo</td>
+          <td><strong>5 Hz</strong></td>
+          <td>Los cambios de altitud en carretera son graduales — 5 Hz es suficiente para detectar pendientes sin generar datos redundantes</td>
+        </tr>
+      </table>
+
+      <h3>Paso 3 — Receptor GNSS</h3>
+      <p>Seleccionar la opción <strong>3 — Configurar sensor GNSS</strong> y dentro de ese submenú seleccionar <strong>5 — Configuración inicial recomendada</strong>. Esta opción ejecuta automáticamente la siguiente secuencia:</p>
+      <table>
+        <tr><th>Acción</th><th>Valor</th><th>Justificación</th></tr>
+        <tr>
+          <td>Cold start</td>
+          <td>—</td>
+          <td>Borra cualquier configuración previa — garantiza un estado inicial conocido</td>
+        </tr>
+        <tr>
+          <td>Modo de navegación</td>
+          <td><strong>Automotive</strong></td>
+          <td>Optimizado para vehículos de pasajeros — acepta aceleraciones de hasta 4g y velocidades de hasta 360 km/h sin truncar datos</td>
+        </tr>
+        <tr>
+          <td>Frecuencia de actualización</td>
+          <td><strong>5 Hz</strong></td>
+          <td>Una posición cada 200 ms — a 60 km/h equivale a una posición cada 3.3 metros, suficiente para georreferenciar eventos de conducción</td>
+        </tr>
+        <tr>
+          <td>Mensajes NMEA</td>
+          <td><strong>Solo GGA y RMC</strong></td>
+          <td>Elimina tramas redundantes (GSA, GSV, GLL, VTG) que saturan el bus UART sin aportar información útil para el análisis</td>
+        </tr>
+      </table>
+
+      <div class="callout">
+        <span class="tag">configuración permanente</span>
+        <p style="margin-bottom:0;">Los cambios del sensor de inercia y barométrico se guardan en <code>config.json</code> y se aplican en cada sesión de captura. Los cambios del GNSS se escriben directamente en la memoria Flash del receptor y persisten después del apagado — no es necesario repetir la configuración en cada uso.</p>
+      </div>
+    </section>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:40px 0;">
+    <p style="color:var(--fg-muted);font-size:0.9em;">Las secciones siguientes describen en detalle cada parámetro y sus implicaciones.</p>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section>
+      <h2>Sensor de inercia — BMI270</h2>
+      <p>El BMI270 es una Unidad de Medición Inercial (IMU) que captura simultáneamente la aceleración lineal en los tres ejes del vehículo y la velocidad angular. Es la fuente primaria de datos para la detección de eventos de riesgo — frenadas bruscas, curvas agresivas, impactos por baches y aceleraciones bruscas.</p>
+
+      <h3>Frecuencia de muestreo</h3>
+      <p>Define cuántas veces por segundo se leen los datos del sensor. A mayor frecuencia, mayor resolución temporal de los eventos capturados.</p>
+
+      <div class="example">
+        <h3>Opciones disponibles</h3>
+        <table>
+          <tr><th>Frecuencia</th><th>Muestras/segundo</th><th>Resolución mínima de evento</th><th>Uso recomendado</th></tr>
+          <tr><td>50 Hz</td><td>50</td><td>20 ms</td><td>Eventos lentos — aceleraciones prolongadas</td></tr>
+          <tr><td><strong>100 Hz</strong></td><td>100</td><td>10 ms</td><td><strong>Recomendado — captura baches y frenadas con buena resolución</strong></td></tr>
+          <tr><td>200 Hz</td><td>200</td><td>5 ms</td><td>Eventos muy cortos — impactos de alta frecuencia</td></tr>
+        </table>
+      </div>
+
+      <div class="callout">
+        <span class="tag">teorema de Nyquist</span>
+        <p style="margin-bottom:0;">Para capturar correctamente un evento de duración mínima <em>T</em>, la frecuencia de muestreo debe ser al menos <em>2/T</em>. Un bache de 50 ms de duración requiere al menos 40 Hz. Con 100 Hz se garantiza capturar eventos de hasta 10 ms con al menos 2 muestras.</p>
+      </div>
+
+      <div class="callout">
+        <span class="tag">almacenamiento</span>
+        <p style="margin-bottom:0;">La frecuencia de muestreo afecta directamente el tamaño de los archivos CSV. A 100 Hz se generan aproximadamente 62 MB por cada 2.5 horas de captura. A 200 Hz ese valor se duplica.</p>
+      </div>
+
+      <h3>Rango del acelerómetro</h3>
+      <p>Define el valor máximo de aceleración que el sensor puede medir correctamente. Si la aceleración real supera el rango configurado, la lectura se satura en el valor máximo — perdiendo información del pico real.</p>
+      <p>Existe una relación inversa entre rango y resolución: a mayor rango, menor resolución por unidad de aceleración.</p>
+
+      <div class="example">
+        <h3>Opciones disponibles</h3>
+        <table>
+          <tr><th>Rango</th><th>Aceleración máxima</th><th>Resolución por unidad</th><th>Uso recomendado</th></tr>
+          <tr><td>2g</td><td>19.6 m/s²</td><td>Alta</td><td>Movimientos suaves — peatonal</td></tr>
+          <tr><td>4g</td><td>39.2 m/s²</td><td>Media-alta</td><td>Conducción urbana tranquila</td></tr>
+          <tr><td><strong>8g</strong></td><td>78.5 m/s²</td><td>Media</td><td><strong>Recomendado — captura frenadas bruscas y baches sin saturar</strong></td></tr>
+          <tr><td>16g</td><td>156.9 m/s²</td><td>Baja</td><td>Impactos de alta magnitud</td></tr>
+        </table>
+      </div>
+
+      <div class="callout">
+        <span class="tag">saturación</span>
+        <p style="margin-bottom:0;">Una frenada de emergencia puede generar hasta 8-10 m/s² de deceleración. Un bache severo puede superar los 20 m/s² en el eje vertical. Con rango de 8g (78.5 m/s²) se capturan correctamente la mayoría de los eventos de conducción de riesgo sin saturación.</p>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section>
+      <h2>Sensor de presión barométrica — BMP280</h2>
+      <p>El BMP280 mide simultáneamente la presión atmosférica y la temperatura. Dado que la presión varía con la altitud, este sensor permite detectar cambios relativos de altura durante el recorrido — útil para contextualizar variaciones en la aceleración longitudinal producidas por pendientes del terreno.</p>
+      <p>La lectura de temperatura que proporciona el sensor no se registra en los archivos CSV. Aunque el dato está disponible, el sensor se encuentra dentro de la carcasa del dispositivo junto con la Raspberry Pi — el calor generado por el procesador eleva la temperatura interior y hace que la lectura no sea representativa de las condiciones atmosféricas exteriores. Adicionalmente, en unidades de transporte público con aire acondicionado, la temperatura interior del vehículo tampoco refleja las condiciones ambientales externas.</p>
+
+      <div class="callout">
+        <span class="tag">limitación</span>
+        <p style="margin-bottom:0;">Por las razones anteriores, la temperatura registrada por el BMP280 no tiene valor analítico en este sistema. Solo se registra la presión atmosférica.</p>
+      </div>
+
+      <h3>Frecuencia de muestreo</h3>
+      <p>Define cuántas veces por segundo se lee la presión atmosférica. Los cambios de altitud en carretera son graduales — una pendiente pronunciada produce variaciones de presión durante varios segundos — por lo que no se requiere una frecuencia alta.</p>
+
+      <div class="example">
+        <h3>Opciones disponibles</h3>
+        <table>
+          <tr><th>Frecuencia</th><th>Uso recomendado</th></tr>
+          <tr><td>1 Hz</td><td>Detección de cambios de altitud muy graduales</td></tr>
+          <tr><td><strong>5 Hz</strong></td><td><strong>Recomendado — suficiente para pendientes en carretera</strong></td></tr>
+          <tr><td>10 Hz</td><td>Mayor resolución temporal — no aporta información adicional relevante</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section>
+      <h2>Receptor GNSS — NEO-M9N</h2>
+      <p>El receptor NEO-M9N proporciona posición geográfica, velocidad y tiempo con precisión métrica. A diferencia de la IMU, el GNSS es un dato contextual — no detecta los eventos de riesgo, sino que los georreferencia sobre el mapa.</p>
+
+      <h3>Modo de navegación</h3>
+      <p>El receptor implementa un filtro de Kalman interno que modela el movimiento esperado según el contexto de uso. Seleccionar el modo correcto mejora la precisión de la posición y reduce errores de estimación al adaptar las restricciones del filtro a la dinámica real del escenario.</p>
+
+      <div class="callout">
+        <span class="tag">modo incorrecto</span>
+        <p style="margin-bottom:0;">Si el receptor está configurado en modo Pedestrian dentro de un vehículo, la velocidad reportada se truncará al límite del modo (108 km/h) aunque el vehículo circule a mayor velocidad. Esto produce datos incorrectos e invalida el análisis de velocidad.</p>
+      </div>
+
+      <div class="example">
+        <h3>Modos disponibles</h3>
+        <table>
+          <tr><th>Modo</th><th>Velocidad máxima</th><th>Descripción</th></tr>
+          <tr><td>Portable (0)</td><td>310 m/s</td><td>Uso general. Modo por defecto de fábrica.</td></tr>
+          <tr><td>Stationary (2)</td><td>0 m/s</td><td>Posición fija. Para antenas de referencia.</td></tr>
+          <tr><td>Pedestrian (3)</td><td>30 m/s (108 km/h)</td><td>Caminata. Útil para verificar el sistema.</td></tr>
+          <tr><td><strong>Automotive (4)</strong></td><td>100 m/s (360 km/h)</td><td><strong>Recomendado — vehículos de pasajeros.</strong></td></tr>
+          <tr><td>Sea (5)</td><td>25 m/s (90 km/h)</td><td>Embarcaciones. Velocidad vertical restringida.</td></tr>
+          <tr><td>Airborne &lt;1g (6)</td><td>50 m/s (180 km/h)</td><td>Aeronaves de baja aceleración.</td></tr>
+          <tr><td>Airborne &lt;2g (7)</td><td>100 m/s (360 km/h)</td><td>Aeronaves típicas.</td></tr>
+          <tr><td>Airborne &lt;4g (8)</td><td>200 m/s (720 km/h)</td><td>Entornos de alta dinámica.</td></tr>
+        </table>
+      </div>
+
+      <h3>Mensajes NMEA</h3>
+      <p>El receptor puede enviar varios tipos de tramas NMEA por el puerto UART. Cada trama ocupa ancho de banda en el bus de comunicación. Deshabilitar las tramas redundantes reduce el tráfico y mejora la estabilidad de la comunicación.</p>
+
+      <div class="example">
+        <h3>Tramas disponibles</h3>
+        <table>
+          <tr><th>Trama</th><th>Contenido</th><th>Estado recomendado</th></tr>
+          <tr><td><code>$GNGGA</code></td><td>Posición, altitud, número de satélites, HDOP</td><td>Activo — fuente primaria de posición</td></tr>
+          <tr><td><code>$GNRMC</code></td><td>Velocidad, rumbo, fecha, estado del fix</td><td>Activo — fuente primaria de velocidad</td></tr>
+          <tr><td><code>$GNGSA</code></td><td>PDOP, VDOP, lista de satélites usados por constelación</td><td>Deshabilitado — HDOP ya viene en GGA</td></tr>
+          <tr><td><code>$GNGSV</code></td><td>Información detallada de cada satélite visible</td><td>Deshabilitado — volumen alto, no usado en el análisis</td></tr>
+          <tr><td><code>$GNGLL</code></td><td>Latitud y longitud</td><td>Deshabilitado — redundante con GGA</td></tr>
+          <tr><td><code>$GNVTG</code></td><td>Curso y velocidad sobre el suelo</td><td>Deshabilitado — redundante con RMC</td></tr>
+        </table>
+      </div>
+
+      <div class="callout">
+        <span class="tag">HDOP</span>
+        <p style="margin-bottom:0;"><em>Horizontal Dilution of Precision</em> — indica qué tan bien distribuidos están los satélites en el cielo. Valores más bajos indican mayor confiabilidad de la posición horizontal: menor a 1.0 es excelente, entre 1.0 y 2.0 es bueno, entre 2.0 y 5.0 es aceptable, mayor a 5.0 es pobre. Este valor se registra en cada trama GGA y puede usarse durante el análisis para filtrar lecturas de baja calidad.</p>
+      </div>
+
+      <h3>Frecuencia de actualización</h3>
+      <p>Define cuántas veces por segundo el receptor calcula una nueva posición y la envía por el puerto UART. A mayor frecuencia, mayor resolución espacial de la trayectoria — pero también mayor tráfico en el bus de comunicación.</p>
+
+      <div class="example">
+        <h3>Opciones disponibles</h3>
+        <table>
+          <tr><th>Frecuencia</th><th>Posición cada...</th><th>A 60 km/h, una posición cada...</th></tr>
+          <tr><td>1 Hz</td><td>1000 ms</td><td>16.7 metros</td></tr>
+          <tr><td>2 Hz</td><td>500 ms</td><td>8.3 metros</td></tr>
+          <tr><td><strong>5 Hz</strong></td><td>200 ms</td><td><strong>3.3 metros — recomendado</strong></td></tr>
+          <tr><td>10 Hz</td><td>100 ms</td><td>1.7 metros</td></tr>
+        </table>
+      </div>
+
+      <div class="callout">
+        <span class="tag">valor de fábrica</span>
+        <p style="margin-bottom:0;">El receptor NEO-M9N arranca por defecto a <strong>1 Hz</strong>. Es necesario ejecutar la configuración inicial del sistema antes de la primera sesión de captura para establecer la frecuencia correcta.</p>
+      </div>
+
+      <h3>Reset del receptor</h3>
+      <p>El receptor almacena datos de asistencia en diferentes memorias para acelerar la adquisición de satélites en arranques posteriores. Los distintos tipos de reset borran diferentes niveles de esta información.</p>
+
+      <div class="example">
+        <h3>Tipos de reset</h3>
+        <table>
+          <tr><th>Tipo</th><th>Qué borra</th><th>Tiempo para obtener fix</th><th>Cuándo usarlo</th></tr>
+          <tr><td>Hot start</td><td>Nada — reinicia el procesamiento</td><td>Segundos</td><td>Cuando el receptor se comporta de forma inesperada</td></tr>
+          <tr><td>Warm start</td><td>Posición y tiempo almacenados</td><td>30-60 segundos</td><td>Cuando hay inconsistencias de posición</td></tr>
+          <tr><td>Cold start</td><td>Todo — incluyendo Flash</td><td>1-3 minutos</td><td>Antes de la configuración inicial o para resolver problemas graves</td></tr>
+        </table>
+      </div>
+
+      <div class="callout">
+        <span class="tag">cold start y configuración</span>
+        <p style="margin-bottom:0;">Un cold start borra todas las configuraciones guardadas en Flash — incluyendo el modo de navegación, la frecuencia y los mensajes NMEA. Después de un cold start es necesario volver a ejecutar la configuración inicial desde <code>configurar_sistema.py</code>.</p>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section>
+      <h2>Archivo de configuración — config.json</h2>
+      <p>Todos los parámetros configurables se guardan en <code>/home/adq/proyecto-gnss/config.json</code>. Este archivo es leído por <code>adquisicion.py</code> al iniciar cada sesión de captura. Si el archivo no existe o falta algún campo, el sistema usa los valores por defecto indicados a continuación.</p>
+
+      <div class="example">
+        <h3>Estructura completa del archivo</h3>
+        <div class="code-block">
+          <div class="code-label">json — /home/adq/proyecto-gnss/config.json</div>
+          <pre><code>{
+  "gnss_mode": 4,           <span class="cm">// modo de navegación (número)</span>
+  "gnss_mode_name": "Automotive",  <span class="cm">// nombre del modo (texto)</span>
+  "gnss_rate_hz": 5,        <span class="cm">// frecuencia GNSS en Hz — default: 5</span>
+  "imu_rate_hz": 100,       <span class="cm">// frecuencia IMU en Hz — default: 100</span>
+  "imu_range_g": 8,         <span class="cm">// rango acelerómetro en g — default: 8</span>
+  "baro_rate_hz": 5         <span class="cm">// frecuencia barométrico en Hz — default: 5</span>
+}</code></pre>
+        </div>
+      </div>
+
+      <div class="callout">
+        <span class="tag">metadatos en los CSV</span>
+        <p style="margin-bottom:0;">Los valores de configuración se escriben como comentarios en la primera línea de cada archivo CSV al iniciar la sesión. Esto garantiza que los parámetros con los que fue capturada cada sesión queden registrados directamente en los datos, independientemente de cambios posteriores en <code>config.json</code>.</p>
+      </div>
+    </section>
+
+    <footer class="page-footer">
+      Documentación del sistema de adquisición de datos vehiculares — Universidad Tecnológica de la Mixteca.
+    </footer>
+
+  </main>
+</div>
+</body>
+</html>
