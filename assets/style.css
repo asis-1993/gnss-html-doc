@@ -190,6 +190,19 @@ li{margin-bottom:6px;}
   color:var(--ink-soft);
 }
 
+.callout-warn{
+  border-color:var(--neg);
+}
+.callout-warn .tag{
+  color:var(--neg);
+}
+.callout-ok{
+  border-color:var(--pos);
+}
+.callout-ok .tag{
+  color:var(--pos);
+}
+
 .page-footer{
   margin-top:52px;
   padding-top:16px;

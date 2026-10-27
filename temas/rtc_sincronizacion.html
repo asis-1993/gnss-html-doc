@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RTC y sincronización horaria · Documentación</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand"><a href="../index.html" style="color:inherit;text-decoration:none;">Documentación</a></div>
+    <div class="brand-sub">Sistema de adquisición vehicular</div>
+
+    <nav>
+      <h4>Primeros pasos</h4>
+      <ul>
+        <li><a href="inicio_rapido.html">Guía de inicio rápido</a></li>
+      </ul>
+
+      <h4>Configuración del sistema</h4>
+      <ul>
+        <li><a href="conexion_wifi.html">Conexión WiFi y SSH</a></li>
+        <li><a href="sincronizacion_drive.html">Sincronización con Google Drive</a></li>
+        <li><a href="rtc_sincronizacion.html" class="active">RTC y sincronización horaria</a></li>
+        <li><a href="referencia_configuracion.html">Referencia de configuración</a></li>
+      </ul>
+
+      <h4>Sensores y adquisición</h4>
+      <ul>
+        <li><a href="#" class="pending">Frecuencias de muestreo</a></li>
+        <li><a href="#" class="pending">Configuración del GNSS</a></li>
+      </ul>
+
+      <h4>Análisis de datos</h4>
+      <ul>
+        <li><a href="#" class="pending">Entorno de análisis (conda + Docker)</a></li>
+        <li><a href="#" class="pending">Descarga de sesiones</a></li>
+      </ul>
+    </nav>
+  </aside>
+
+  <!-- ============ CONTENIDO ============ -->
+  <main class="content">
+
+    <header class="page-header">
+      <p class="kicker">Configuración del sistema</p>
+      <h1>RTC y sincronización horaria</h1>
+      <p class="lede">La Raspberry Pi 5 incluye un reloj de tiempo real (RTC) respaldado por batería. Esta guía describe su funcionamiento, la verificación de persistencia y el mecanismo de recalibración automática en cada sincronización.</p>
+    </header>
+
+    <section>
+      <h2>¿Qué es el RTC y por qué importa?</h2>
+      <p>El RTC (<em>Real-Time Clock</em>) es un circuito integrado que mantiene la hora del sistema aunque el dispositivo esté apagado o sin conexión a internet. En la Raspberry Pi 5 el RTC está incorporado en el chip RP1 y se alimenta mediante una pequeña batería tipo RTC (conector J2).</p>
+      <p>En un sistema de adquisición vehicular la hora es un dato crítico: los archivos CSV de IMU, GNSS y barométrico se nombran con el timestamp de inicio de sesión (<code>imu_YYYYMMDD_HHMMSS.csv</code>) y cada muestra lleva una marca de tiempo. Si el RTC no está sincronizado, los datos de distintas sesiones no se pueden alinear correctamente durante el análisis.</p>
+
+      <div class="callout">
+        <span class="tag">Debian trixie</span>
+        <p style="margin-bottom:0;">En Debian trixie (la distribución que corre en la Raspberry Pi 5) el servicio <strong>systemd-timesyncd</strong> gestiona el RTC de forma automática: cuando NTP está activo y la sincronización es exitosa, el RTC se actualiza sin intervención manual. La herramienta <code>hwclock</code> no está instalada y no es necesaria.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Batería del RTC — instalación</h2>
+      <p>La Raspberry Pi 5 trae el conector J2 en la placa para conectar una batería RTC externa. Sin batería, el RTC pierde la hora cada vez que el dispositivo se apaga.</p>
+      <p>La batería compatible es de tipo <strong>ML2032</strong> o equivalente recargable (la RPi 5 puede recargarla). Una batería no recargable estándar CR2032 también funciona, pero debe desactivarse el circuito de carga para evitar dañarla — consultar la documentación oficial de Raspberry Pi para este caso.</p>
+
+      <div class="callout callout-warn">
+        <span class="tag">importante</span>
+        <p style="margin-bottom:0;">El botón físico J2 de la Raspberry Pi 5 (botón de encendido de fábrica) y el conector J2 del RTC son componentes distintos en la placa. El conector del RTC es un header de 2 pines etiquetado <strong>BAT</strong> en algunas revisiones de la placa.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Cómo funciona la sincronización</h2>
+      <p>El sistema opera en dos niveles:</p>
+
+      <h3>Nivel 1 — Sincronización NTP al arrancar</h3>
+      <p>Cada vez que la Raspberry Pi arranca con conexión a internet, <code>systemd-timesyncd</code> sincroniza automáticamente el reloj del sistema con los servidores NTP configurados. Una vez sincronizado, actualiza el RTC con la hora correcta. Este proceso ocurre en segundo plano sin intervención manual.</p>
+
+      <h3>Nivel 2 — Recalibración explícita antes de sincronizar con Drive</h3>
+      <p>El script <code>sincronizacion.py</code> llama a la función <code>sincronizar_rtc()</code> inmediatamente después de confirmar conexión a internet y antes de subir los archivos a Google Drive. Esta función:</p>
+      <ol>
+        <li>Activa NTP explícitamente con <code>timedatectl set-ntp true</code></li>
+        <li>Espera hasta 30 segundos a que <code>systemd-timesyncd</code> confirme sincronización</li>
+        <li>Registra el resultado en el log del sistema</li>
+      </ol>
+      <p>El resultado es que cada vez que el sistema sube datos a Drive, garantiza que el RTC esté actualizado para la siguiente sesión de captura.</p>
+
+      <pre><code># Fragmento de sincronizacion.py — función sincronizar_rtc()
+def sincronizar_rtc():
+    subprocess.run(['sudo', 'timedatectl', 'set-ntp', 'true'], ...)
+    for _ in range(10):
+        resultado = subprocess.run(
+            ['timedatectl', 'show', '--property=NTPSynchronized', '--value'], ...
+        )
+        if resultado.stdout.strip() == 'yes':
+            log.info('RTC sincronizado correctamente via NTP.')
+            return
+        time.sleep(3)
+    log.warning('NTP no confirmó sincronización en 30 s.')</code></pre>
+
+      <p>La función es tolerante a fallos: si NTP no responde o hay error, registra una advertencia en el log pero no interrumpe la subida de archivos.</p>
+    </section>
+
+    <section>
+      <h2>Permiso sudo para timedatectl</h2>
+      <p>La función <code>sincronizar_rtc()</code> ejecuta <code>timedatectl set-ntp true</code> con <code>sudo</code>. Para que esto funcione sin requerir contraseña (el script corre de forma desatendida), se configuró una regla en <code>sudoers</code>:</p>
+
+      <pre><code># Crear el archivo de regla
+sudo visudo -f /etc/sudoers.d/gnss-rtc</code></pre>
+
+      <p>Contenido del archivo:</p>
+      <pre><code>adq ALL=(ALL) NOPASSWD: /bin/timedatectl set-ntp true</code></pre>
+
+      <p>Verificar que la sintaxis es correcta antes de guardar:</p>
+      <pre><code>sudo visudo -c -f /etc/sudoers.d/gnss-rtc
+# Salida esperada: /etc/sudoers.d/gnss-rtc: parsed OK</code></pre>
+
+      <div class="callout">
+        <span class="tag">seguridad</span>
+        <p style="margin-bottom:0;">La regla NOPASSWD está restringida exactamente al comando <code>/bin/timedatectl set-ntp true</code> — no otorga privilegios adicionales al usuario <code>adq</code>.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Verificación de persistencia (H-03)</h2>
+      <p>Para confirmar que la batería mantiene la hora correctamente cuando el dispositivo no tiene red, se realizó la siguiente prueba:</p>
+
+      <h3>Procedimiento</h3>
+      <ol>
+        <li>Deshabilitar NTP y establecer una hora falsa:</li>
+      </ol>
+      <pre><code>sudo timedatectl set-ntp false
+sudo timedatectl set-time "2020-01-01 00:00:00"
+sudo reboot</code></pre>
+
+      <ol start="2">
+        <li>Después del reinicio, verificar que el sistema arrancó con la hora del RTC (2020), no con la hora real:</li>
+      </ol>
+      <pre><code>timedatectl</code></pre>
+
+      <p>Resultado observado — el RTC conservó la hora falsa, confirmando que la batería funciona:</p>
+      <pre><code>       Local time: lun 2026-10-26 22:58:09 CST
+     Universal time: mar 2026-10-27 04:58:09 UTC
+           RTC time: mié 2020-01-01 06:02:02
+          Time zone: America/Mexico_City (CST, -0600)
+System clock synchronized: no
+          NTP service: inactive
+      RTC in local TZ: no</code></pre>
+
+      <ol start="3">
+        <li>Restaurar la sincronización NTP:</li>
+      </ol>
+      <pre><code>sudo timedatectl set-ntp true</code></pre>
+
+      <ol start="4">
+        <li>Verificar sincronización exitosa:</li>
+      </ol>
+      <pre><code>timedatectl</code></pre>
+      <pre><code>       Local time: lun 2026-10-26 23:00:15 CST
+     Universal time: mar 2026-10-27 05:00:15 UTC
+           RTC time: mar 2026-10-27 05:00:15
+System clock synchronized: yes
+          NTP service: active
+      RTC in local TZ: no</code></pre>
+
+      <div class="callout callout-ok">
+        <span class="tag">verificado</span>
+        <p style="margin-bottom:0;"><strong>H-03 completado — 2026-10-27.</strong> El RTC mantiene la hora sin conexión a red. Al restablecer NTP, el reloj del sistema y el RTC quedan sincronizados en segundos.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Verificar el estado del RTC en cualquier momento</h2>
+      <pre><code>timedatectl</code></pre>
+      <p>Los campos relevantes son:</p>
+      <table>
+        <thead>
+          <tr><th>Campo</th><th>Valor esperado en operación normal</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>RTC time</code></td><td>Igual o muy cercano a <em>Universal time</em></td></tr>
+          <tr><td><code>System clock synchronized</code></td><td><code>yes</code></td></tr>
+          <tr><td><code>NTP service</code></td><td><code>active</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+  </main>
+</div>
+</body>
+</html>
