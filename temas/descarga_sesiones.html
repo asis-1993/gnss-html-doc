@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Descarga de sesiones · Documentación</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand"><a href="../index.html" style="color:inherit;text-decoration:none;">Documentación</a></div>
+    <div class="brand-sub">Sistema de adquisición vehicular</div>
+
+    <nav>
+      <h4>Primeros pasos</h4>
+      <ul>
+        <li><a href="inicio_rapido.html">Guía de inicio rápido</a></li>
+      </ul>
+
+      <h4>Configuración del sistema</h4>
+      <ul>
+        <li><a href="conexion_wifi.html">Conexión WiFi y SSH</a></li>
+        <li><a href="sincronizacion_drive.html">Sincronización con Google Drive</a></li>
+        <li><a href="rtc_sincronizacion.html">RTC y sincronización horaria</a></li>
+        <li><a href="referencia_configuracion.html">Referencia de configuración</a></li>
+      </ul>
+
+      <h4>Sensores y adquisición</h4>
+      <ul>
+        <li><a href="#" class="pending">Frecuencias de muestreo</a></li>
+        <li><a href="#" class="pending">Configuración del GNSS</a></li>
+      </ul>
+
+      <h4>Análisis de datos</h4>
+      <ul>
+        <li><a href="entorno_analisis.html">Entorno de análisis (conda + Docker)</a></li>
+        <li><a href="descarga_sesiones.html" class="active">Descarga de sesiones</a></li>
+      </ul>
+    </nav>
+  </aside>
+
+  <!-- ============ CONTENIDO ============ -->
+  <main class="content">
+
+    <header class="page-header">
+      <p class="kicker">Análisis de datos</p>
+      <h1>Descarga de sesiones</h1>
+      <p class="lede">El script <code>descargar_datos.py</code> descarga los archivos CSV desde Google Drive al equipo de análisis, organizados por día y sesión. La descarga es idempotente: si un archivo ya existe y su contenido no cambió, se omite.</p>
+    </header>
+
+    <section>
+      <h2>Estructura de archivos en Drive</h2>
+      <p>Los archivos se organizan en Google Drive bajo la carpeta del proyecto, agrupados por día de captura. Cada sesión genera tres archivos — uno por sensor:</p>
+
+      <pre><code>proyecto-gnss/
+├── 20260829/
+│   ├── baro_20260829_002453.csv
+│   ├── gnss_20260829_002453.csv
+│   └── imu_20260829_002453.csv
+├── 20260910/
+│   ├── baro_20260910_190817.csv
+│   ├── gnss_20260910_190817.csv
+│   └── imu_20260910_190817.csv
+└── ...</code></pre>
+
+      <p>El nombre de cada archivo sigue el patrón <code>{sensor}_{YYYYMMDD}_{HHMMSS}.csv</code>, donde la hora corresponde al momento de inicio de la sesión de captura.</p>
+
+      <div class="callout">
+        <span class="tag">convención</span>
+        <p style="margin-bottom:0;">El timestamp en el nombre es la hora local del sistema en el momento en que inició la adquisición. Dado que el RTC está sincronizado con NTP antes de cada sincronización, este timestamp es confiable como identificador de sesión.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Modos de operación</h2>
+      <p>El script tiene tres modos, seleccionables mediante argumentos en la línea de comandos:</p>
+
+      <h3>Listado — <code>--listar</code></h3>
+      <p>Muestra el inventario completo de sesiones disponibles en Drive sin descargar nada. Útil para planificar qué datos analizar antes de descargar.</p>
+      <pre><code>python3 descargar_datos.py --listar</code></pre>
+      <p>Salida típica:</p>
+      <pre><code>INFO: Conectado a Google Drive.
+INFO: Modo listado - no se descargará nada
+INFO: 20260829: 11 sesión(es), 33 archivo(s)
+INFO:    Sesión 20260829_002453: baro, gnss, imu
+INFO:    Sesión 20260829_003701: baro, gnss, imu
+...
+INFO: 20260910: 3 sesión(es), 9 archivo(s)
+INFO:    Sesión 20260910_190817: baro, gnss, imu</code></pre>
+
+      <h3>Un día — <code>--fecha YYYYMMDD</code></h3>
+      <p>Descarga únicamente las sesiones de la fecha indicada. Conveniente cuando se quiere trabajar con datos recientes sin esperar la descarga completa.</p>
+      <pre><code>python3 descargar_datos.py --fecha 20260910</code></pre>
+
+      <h3>Descarga completa (sin argumentos)</h3>
+      <p>Descarga todos los días disponibles en Drive. Los archivos que ya existen localmente y cuyo contenido no cambió se omiten automáticamente (verificación MD5).</p>
+      <pre><code>python3 descargar_datos.py</code></pre>
+      <p>Al finalizar, el script muestra un resumen:</p>
+      <pre><code>Resumen:
+  Archivos en Drive : 106
+  Descargados       : 102
+  Ya existían       : 4
+  Con error         : 0</code></pre>
+    </section>
+
+    <section>
+      <h2>Estructura local de destino</h2>
+      <p>Los archivos se guardan en el subdirectorio <code>datos/</code> del repositorio, replicando la misma organización por día que tiene Drive:</p>
+      <pre><code>gnss-project-analysis/
+├── datos/
+│   ├── 20260829/
+│   │   ├── baro_20260829_002453.csv
+│   │   ├── gnss_20260829_002453.csv
+│   │   └── imu_20260829_002453.csv
+│   └── 20260910/
+│       └── ...
+├── descargar_datos.py
+├── token.json          ← no se sube a git (.gitignore)
+└── .gitignore</code></pre>
+
+      <div class="callout callout-warn">
+        <span class="tag">importante</span>
+        <p style="margin-bottom:0;">El directorio <code>datos/</code> y el archivo <code>token.json</code> están excluidos del repositorio git mediante <code>.gitignore</code>. El token nunca debe commitearse — contiene credenciales OAuth que dan acceso a Google Drive del proyecto.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Verificación de integridad</h2>
+      <p>Antes de guardar cada archivo, el script calcula el MD5 del archivo descargado y lo compara con el MD5 que reporta la API de Google Drive. Si coinciden, el archivo se guarda. Si ya existe un archivo local con el mismo MD5, la descarga se omite.</p>
+      <p>Este mecanismo garantiza dos propiedades:</p>
+      <ul>
+        <li><strong>Integridad:</strong> los archivos descargados son idénticos a los que subió la Raspberry Pi.</li>
+        <li><strong>Idempotencia:</strong> ejecutar el script varias veces no duplica ni sobreescribe archivos que ya están correctos.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Requisitos</h2>
+      <p>El script requiere el entorno conda <code>gnss-analysis</code> con las siguientes dependencias instaladas:</p>
+      <pre><code>conda activate gnss-analysis
+pip install google-auth-oauthlib google-api-python-client</code></pre>
+
+      <p>Además, el archivo <code>token.json</code> debe estar en el mismo directorio que el script. Este token se genera una sola vez siguiendo el procedimiento de la guía <a href="sincronizacion_drive.html">Sincronización con Google Drive</a> — el mismo token que usa la Raspberry Pi también es válido para la descarga, ya que ambos usan el scope <code>drive</code>.</p>
+
+      <div class="callout">
+        <span class="tag">scope OAuth</span>
+        <p style="margin-bottom:0;">El script usa el scope <code>https://www.googleapis.com/auth/drive</code> — el mismo que usa <code>sincronizacion.py</code> en la Raspberry Pi. Ambos scripts comparten el mismo <code>token.json</code>, por lo que no es necesario generar un token separado para la descarga.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Anomalías conocidas</h2>
+
+      <h3>Sesión con archivo duplicado</h3>
+      <p>La sesión <code>20260928_113445</code> contiene dos archivos barométricos en Drive (<code>baro, baro, gnss, imu</code>). Esto puede ocurrir si el script de sincronización en la Raspberry Pi subió el archivo dos veces debido a un error de red o una interrupción durante la verificación MD5. El script de descarga maneja este caso: descarga el primero y omite el segundo (mismo nombre, mismo contenido).</p>
+    </section>
+
+  </main>
+</div>
+</body>
+</html>
